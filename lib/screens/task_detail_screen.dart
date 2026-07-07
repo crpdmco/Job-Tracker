@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/task_category.dart';
+
 import '../models/task.dart';
 import '../models/task_period.dart';
 import '../models/time_entry.dart';
@@ -41,7 +42,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     return FutureBuilder(
       future: Future.wait([
         DbService.instance.getTask(widget.taskId),
-        DbService.instance.getCategories(),
+        DbService.instance.getTaskCategories(widget.taskId),
         DbService.instance.getEntriesForTask(widget.taskId),
         DbService.instance.getActiveEntry(),
         DbService.instance.getPeriodsForTask(widget.taskId),
@@ -58,11 +59,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             body: const Center(child: Text('Task deleted')),
           );
         }
-        final categories = snap.data![1] as List<TaskCategory>;
+        final taskCategories = snap.data![1] as List<TaskCategory>;
         final entries = snap.data![2] as List<TimeEntry>;
         final active = snap.data![3] as TimeEntry?;
         final periods = snap.data![4] as List<TaskPeriod>;
-        final catMap = {for (final c in categories) c.id: c};
         final total =
             entries.fold(Duration.zero, (a, e) => a + e.duration);
         final isThisActive = active?.taskId == task.id;
@@ -119,23 +119,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                             fontWeight: FontWeight.w700,
                           )),
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                children: [
-                  if (catMap[task.categoryId] != null)
-                    TaskCategoryChip(
-                        category: catMap[task.categoryId]!),
-                  Chip(
-                    avatar: const Icon(Icons.date_range, size: 14),
-                    label: Text(
-                      '${periods.length} period${periods.length == 1 ? '' : 's'}',
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                ],
-              ),
+              _CategoryChips(
+                  categories: taskCategories, periodsCount: periods.length),
               if (task.description != null) ...[
                 const SizedBox(height: 12),
                 Text(task.description!,
@@ -473,6 +458,34 @@ class _EntryTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _CategoryChips extends StatelessWidget {
+  const _CategoryChips({
+    required this.categories,
+    required this.periodsCount,
+  });
+  final List<TaskCategory> categories;
+  final int periodsCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      children: [
+        ...categories.map((c) => TaskCategoryChip(category: c)),
+        Chip(
+          avatar: const Icon(Icons.date_range, size: 14),
+          label: Text(
+            '$periodsCount period${periodsCount == 1 ? '' : 's'}',
+            style: const TextStyle(fontSize: 12),
+          ),
+          visualDensity: VisualDensity.compact,
+        ),
+      ],
     );
   }
 }

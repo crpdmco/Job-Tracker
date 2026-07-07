@@ -18,7 +18,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _title;
   late TextEditingController _description;
-  String? _categoryId;
+  Set<String> _categoryIds = {};
   late List<_PeriodDraft> _periods;
 
   @override
@@ -27,10 +27,10 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     final t = widget.existing;
     _title = TextEditingController(text: t?.title ?? '');
     _description = TextEditingController(text: t?.description ?? '');
-    _categoryId = t?.categoryId;
     _periods = [];
     if (widget.existing != null) {
       _loadPeriods();
+      _loadCategories();
     }
   }
 
@@ -46,6 +46,11 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
               existingId: p.id))
           .toList();
     });
+  }
+
+  Future<void> _loadCategories() async {
+    final ids = await DbService.instance.getTaskCategoryIds(widget.existing!.id);
+    setState(() => _categoryIds = ids.toSet());
   }
 
   @override
@@ -71,7 +76,6 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
         description: _description.text.trim().isEmpty
             ? null
             : _description.text.trim(),
-        categoryId: _categoryId,
         createdAt: widget.existing?.createdAt ?? DateTime.now(),
       );
 
@@ -82,6 +86,9 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
         await db.updateTask(task);
         saved = task;
       }
+
+      // Save categories (tags)
+      await db.setTaskCategories(saved.id, _categoryIds.toList());
 
       // Sync periods: remove existing, re-add current drafts
       if (widget.existing != null) {
@@ -159,7 +166,14 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            _SectionHeader(title: 'Category'),
+            _SectionHeader(title: 'Categories (tags)'),
+            const SizedBox(height: 4),
+            Text(
+              'Add one or more categories to this task.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
             const SizedBox(height: 8),
             FutureBuilder<List<TaskCategory>>(
               future: DbService.instance.getCategories(),
@@ -171,20 +185,18 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                 return Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: [
-                    _CategoryChoice(
-                      label: 'None',
-                      color: Colors.grey,
-                      selected: _categoryId == null,
-                      onTap: () => setState(() => _categoryId = null),
-                    ),
-                    ...cats.map((c) => _CategoryChoice(
-                          label: c.name,
-                          color: c.color,
-                          selected: _categoryId == c.id,
-                          onTap: () => setState(() => _categoryId = c.id),
-                        )),
-                  ],
+                  children: cats.map((c) => _CategoryChip(
+                        label: c.name,
+                        color: c.color,
+                        selected: _categoryIds.contains(c.id),
+                        onTap: () => setState(() {
+                          if (_categoryIds.contains(c.id)) {
+                            _categoryIds.remove(c.id);
+                          } else {
+                            _categoryIds.add(c.id);
+                          }
+                        }),
+                      )).toList(),
                 );
               },
             ),
@@ -271,8 +283,8 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _CategoryChoice extends StatelessWidget {
-  const _CategoryChoice({
+class _CategoryChip extends StatelessWidget {
+  const _CategoryChip({
     required this.label,
     required this.color,
     required this.selected,
@@ -288,7 +300,8 @@ class _CategoryChoice extends StatelessWidget {
     return InkWell(
       borderRadius: BorderRadius.circular(20),
       onTap: onTap,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: selected ? color.withValues(alpha: 0.18) : Colors.transparent,
@@ -312,6 +325,10 @@ class _CategoryChoice extends StatelessWidget {
                     fontSize: 13,
                     fontWeight:
                         selected ? FontWeight.w600 : FontWeight.w500)),
+            if (selected) ...[
+              const SizedBox(width: 6),
+              Icon(Icons.check, size: 14, color: color),
+            ],
           ],
         ),
       ),

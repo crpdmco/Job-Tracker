@@ -26,8 +26,8 @@ class ReportService {
     required List<TimeEntry> entries,
     required DateTime from,
     required DateTime to,
+    Map<String, List<TaskCategory>>? taskCats,
   }) async {
-    final catMap = {for (final c in categories) c.id: c};
     final taskMap = {for (final t in tasks) t.id: t};
 
     // Per-task aggregation
@@ -89,10 +89,12 @@ class ReportService {
             headers: const ['Task', 'Category', 'Time', 'Sessions'],
             data: byTask.keys.map((id) {
               final t = taskMap[id]!;
-              final cat = catMap[t.categoryId];
+              final cats = taskCats?[id] ?? [];
+              final catNames =
+                  cats.map((c) => c.name).join(', ');
               return [
                 t.title,
-                cat?.name ?? '—',
+                catNames.isEmpty ? '—' : catNames,
                 TimeUtils.formatHoursCompact(totals[id]!),
                 '${byTask[id]!.length}',
               ];

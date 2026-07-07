@@ -38,6 +38,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         DbService.instance.getAllEntries(),
         DbService.instance.getTasks(),
         DbService.instance.getCategories(),
+        DbService.instance.getAllTaskCategories(),
       ]),
       builder: (context, snap) {
         if (!snap.hasData) {
@@ -46,7 +47,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final entries = snap.data![0] as List<TimeEntry>;
         final tasks = snap.data![1] as List<Task>;
         final categories = snap.data![2] as List<TaskCategory>;
-        return _DashboardBody(entries: entries, tasks: tasks, categories: categories);
+        final taskCats = snap.data![3] as Map<String, List<TaskCategory>>;
+        return _DashboardBody(
+            entries: entries,
+            tasks: tasks,
+            categories: categories,
+            taskCats: taskCats);
       },
     );
   }
@@ -57,14 +63,15 @@ class _DashboardBody extends StatelessWidget {
     required this.entries,
     required this.tasks,
     required this.categories,
+    required this.taskCats,
   });
   final List<TimeEntry> entries;
   final List<Task> tasks;
   final List<TaskCategory> categories;
+  final Map<String, List<TaskCategory>> taskCats;
 
   @override
   Widget build(BuildContext context) {
-    final taskMap = {for (final t in tasks) t.id: t};
     final catMap = {for (final c in categories) c.id: c};
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -102,9 +109,11 @@ class _DashboardBody extends StatelessWidget {
     // Per-category breakdown
     final byCategory = <String, Duration>{};
     for (final e in entries) {
-      final catId = taskMap[e.taskId]?.categoryId;
-      if (catId == null) continue;
-      byCategory[catId] = (byCategory[catId] ?? Duration.zero) + e.duration;
+      final cats = taskCats[e.taskId] ?? [];
+      for (final cat in cats) {
+        byCategory[cat.id] =
+            (byCategory[cat.id] ?? Duration.zero) + e.duration;
+      }
     }
     final catSorted = byCategory.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));

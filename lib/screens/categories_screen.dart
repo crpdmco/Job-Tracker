@@ -11,88 +11,84 @@ class CategoriesScreen extends StatefulWidget {
 }
 
 class _CategoriesScreenState extends State<CategoriesScreen> {
-  late final StreamSubscription _sub;
+  List<TaskCategory> _cats = [];
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _sub = DbService.instance.changes.listen((_) {
-      if (mounted) setState(() {});
-    });
+    _load();
   }
 
-  @override
-  void dispose() {
-    _sub.cancel();
-    super.dispose();
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    final cats = await DbService.instance.getCategories();
+    if (mounted) setState(() { _cats = cats; _loading = false; });
   }
 
   Future<void> _edit({TaskCategory? existing}) async {
-    final result = await showModalBottomSheet<TaskCategory>(
+    final result = await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (ctx) => _CategoryEditor(existing: existing),
     );
-    if (result != null && mounted) setState(() {});
+    if (result == true && mounted) _load();
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<TaskCategory>>(
-      future: DbService.instance.getCategories(),
-      builder: (context, snap) {
-        final cats = snap.data ?? [];
-        return Scaffold(
-          body: SafeArea(
-            child: ListView(
-              padding: const EdgeInsets.all(20),
+    if (_loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    return Scaffold(
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            Row(
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text('Categories',
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineMedium
-                              ?.copyWith(fontWeight: FontWeight.w700)),
-                    ),
-                    FilledButton.tonalIcon(
-                      onPressed: () => _edit(),
-                      icon: const Icon(Icons.add),
-                      label: const Text('New'),
-                    ),
-                  ],
+                Expanded(
+                  child: Text('Categories',
+                      style: Theme.of(context)
+                          .textTheme
+                          .headlineMedium
+                          ?.copyWith(fontWeight: FontWeight.w700)),
                 ),
-                const SizedBox(height: 16),
-                if (cats.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.all(40),
-                    child: Center(child: Text('No categories yet.')),
-                  )
-                else
-                  ...cats.map((c) => Card(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: c.color.withValues(alpha: 0.18),
-                            child: Icon(c.icon, color: c.color),
-                          ),
-                          title: Text(c.name),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.delete_outline),
-                            onPressed: () async {
-                              await DbService.instance.deleteCategory(c.id);
-                              if (mounted) setState(() {});
-                            },
-                          ),
-                          onTap: () => _edit(existing: c),
-                        ),
-                      )),
+                FilledButton.tonalIcon(
+                  onPressed: () => _edit(),
+                  icon: const Icon(Icons.add),
+                  label: const Text('New'),
+                ),
               ],
             ),
-          ),
-        );
-      },
+            const SizedBox(height: 16),
+            if (_cats.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(40),
+                child: Center(child: Text('No categories yet.')),
+              )
+            else
+              ..._cats.map((c) => Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: c.color.withValues(alpha: 0.18),
+                        child: Icon(c.icon, color: c.color),
+                      ),
+                      title: Text(c.name),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        onPressed: () async {
+                          await DbService.instance.deleteCategory(c.id);
+                          if (mounted) _load();
+                        },
+                      ),
+                      onTap: () => _edit(existing: c),
+                    ),
+                  )),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -131,6 +127,12 @@ class _CategoryEditorState extends State<_CategoryEditor> {
     _name = TextEditingController(text: widget.existing?.name ?? '');
     _color = widget.existing?.colorValue ?? _colors.first;
     _icon = widget.existing?.iconName ?? 'work';
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
   }
 
   @override

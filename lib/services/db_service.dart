@@ -42,7 +42,7 @@ class DbService {
         : p.join(await getDatabasesPath(), 'jobtrackr.db');
     return openDatabase(
       dbPath,
-      version: 2,
+      version: 3,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -88,6 +88,13 @@ class DbService {
         createdAt TEXT NOT NULL
       )
     ''');
+    await db.execute('''
+      CREATE TABLE task_categories (
+        taskId TEXT NOT NULL,
+        categoryId TEXT NOT NULL,
+        PRIMARY KEY (taskId, categoryId)
+      )
+    ''');
     await _seedDefaults(db);
   }
 
@@ -118,9 +125,24 @@ class DbService {
           'createdAt': row['createdAt'] as String,
         });
       }
-
-      // Remove deprecated columns from tasks (SQLite can't drop columns,
-      // so we just ignore them from now on)
+    }
+    if (oldV < 3) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS task_categories (
+          taskId TEXT NOT NULL,
+          categoryId TEXT NOT NULL,
+          PRIMARY KEY (taskId, categoryId)
+        )
+      ''');
+      // Migrate existing categoryId from tasks table
+      final existing = await db.rawQuery(
+          'SELECT id, categoryId FROM tasks WHERE categoryId IS NOT NULL');
+      for (final row in existing) {
+        await db.insert('task_categories', {
+          'taskId': row['id'] as String,
+          'categoryId': row['categoryId'] as String,
+        });
+      }
     }
   }
 
@@ -211,7 +233,6 @@ class DbService {
         id: t.id.isEmpty ? _uuid.v4() : t.id,
         title: t.title,
         description: t.description,
-        categoryId: t.categoryId,
         createdAt: t.createdAt,
       );
       await db.insert('tasks', withId.toMap());
@@ -241,6 +262,60 @@ class DbService {
       await db.delete(
           'task_periods', where: 'taskId = ?', whereArgs: [id]);
       await db.delete('time_entries', where: 'taskId = ?', whereArgs: [id]);
+      await db.delete(
+          'task_categories', where: 'taskId = ?', whereArgs: [id]);
+      _changes.add(null);
+    } catch (e) {
+      _errors.add(e.toString());
+      rethrow;
+    }
+  }
+
+  // ---- Task categories (tags) ----
+  Future<List<TaskCategory>> getTaskCategories(String taskId) async {
+    final db = await database;
+    final rows = await db.rawQuery('''
+      SELECT c.* FROM categories c
+      INNER JOIN task_categories tc ON c.id = tc.categoryId
+      WHERE tc.taskId = ?
+      ORDER BY c.name ASC
+    ''', [taskId]);
+    return rows.map(TaskCategory.fromMap).toList();
+  }
+
+  Future<List<String>> getTaskCategoryIds(String taskId) async {
+    final db = await database;
+    final rows = await db.query('task_categories',
+        where: 'taskId = ?', whereArgs: [taskId]);
+    return rows.map((r) => r['categoryId'] as String).toList();
+  }
+
+  /// Returns a map of taskId → list of categories for all tasks.
+  Future<Map<String, List<TaskCategory>>> getAllTaskCategories() async {
+    final db = await database;
+    final rows = await db.rawQuery('''
+      SELECT tc.taskId, c.* FROM task_categories tc
+      INNER JOIN categories c ON c.id = tc.categoryId
+      ORDER BY c.name ASC
+    ''');
+    final map = <String, List<TaskCategory>>{};
+    for (final row in rows) {
+      final taskId = row['taskId'] as String;
+      final cat = TaskCategory.fromMap(row);
+      map.putIfAbsent(taskId, () => []).add(cat);
+    }
+    return map;
+  }
+
+  Future<void> setTaskCategories(
+      String taskId, List<String> categoryIds) async {
+    try {
+      final db = await database;
+      await db.delete('task_categories', where: 'taskId = ?', whereArgs: [taskId]);
+      for (final catId in categoryIds) {
+        await db.insert(
+            'task_categories', {'taskId': taskId, 'categoryId': catId});
+      }
       _changes.add(null);
     } catch (e) {
       _errors.add(e.toString());

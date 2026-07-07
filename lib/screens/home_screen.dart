@@ -135,16 +135,18 @@ class _TasksTabState extends State<_TasksTab> {
     final db = DbService.instance;
     return FutureBuilder(
       key: ValueKey(_refreshKey),
-      future: Future.wait(
-          [db.getTasks(includeArchived: _showArchived), db.getCategories(), db.getActiveEntry()]),
+      future: Future.wait([
+        db.getTasks(includeArchived: _showArchived),
+        db.getActiveEntry(),
+        db.getAllTaskCategories(),
+      ]),
       builder: (context, snap) {
         if (!snap.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
         final tasks = (snap.data![0] as List<Task>);
-        final categories = (snap.data![1] as List<TaskCategory>);
-        final active = snap.data![2] as TimeEntry?;
-        final catMap = {for (final c in categories) c.id: c};
+        final active = snap.data![1] as TimeEntry?;
+        final taskCats = snap.data![2] as Map<String, List<TaskCategory>>;
         var filtered = tasks;
         if (_searchQuery.isNotEmpty) {
           filtered = filtered
@@ -248,7 +250,7 @@ class _TasksTabState extends State<_TasksTab> {
                       final t = filtered[i];
                       return _TaskCard(
                         task: t,
-                        category: catMap[t.categoryId],
+                        categories: taskCats[t.id] ?? const [],
                       );
                     },
                   ),
@@ -383,13 +385,15 @@ class _ActiveTimerCardState extends State<_ActiveTimerCard> {
 }
 
 class _TaskCard extends StatelessWidget {
-  const _TaskCard({required this.task, required this.category});
+  const _TaskCard({required this.task, required this.categories});
   final Task task;
-  final TaskCategory? category;
+  final List<TaskCategory> categories;
 
   @override
   Widget build(BuildContext context) {
-    final color = category?.color ?? Theme.of(context).colorScheme.primary;
+    final color = categories.isNotEmpty
+        ? categories.first.color
+        : Theme.of(context).colorScheme.primary;
     return Dismissible(
       key: ValueKey(task.id),
       direction: DismissDirection.endToStart,
@@ -454,8 +458,9 @@ class _TaskCard extends StatelessWidget {
                     color: color.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child:
-                      Icon(category?.icon ?? Icons.work_outline, color: color),
+                  child: Icon(
+                      categories.isNotEmpty ? categories.first.icon : Icons.work_outline,
+                      color: color),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -470,11 +475,20 @@ class _TaskCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          if (category != null) ...[
-                            TaskCategoryChip(
-                                category: category!, small: true),
-                            const SizedBox(width: 8),
-                          ],
+                          ...categories.take(2).map((c) => Padding(
+                                padding: const EdgeInsets.only(right: 4),
+                                child: TaskCategoryChip(
+                                    category: c, small: true),
+                              )),
+                          if (categories.length > 2)
+                            Text('+${categories.length - 2}',
+                                style: TextStyle(
+                                    fontSize: 10,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant)),
+                          if (categories.isNotEmpty)
+                            const SizedBox(width: 6),
                           _PeriodMiniBadge(taskId: task.id),
                         ],
                       ),

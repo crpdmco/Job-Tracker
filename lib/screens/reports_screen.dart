@@ -62,6 +62,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         return;
       }
       final svc = ReportService();
+      final taskCats = await db.getAllTaskCategories();
       final path = pdf
           ? await svc.generatePdf(
               tasks: tasks,
@@ -69,6 +70,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               entries: entries,
               from: _from,
               to: _to,
+              taskCats: taskCats,
             )
           : await svc.generateCsv(
               tasks: tasks,
