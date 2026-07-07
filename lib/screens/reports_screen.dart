@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../services/db_service.dart';
@@ -80,6 +82,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
             );
       if (mounted) {
         await svc.share(path);
+        if (mounted) {
+          final name = path.split(Platform.pathSeparator).last;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Report saved: $name')),
+          );
+        }
       }
     } finally {
       if (mounted) setState(() => _busy = false);
