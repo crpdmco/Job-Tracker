@@ -1,0 +1,43 @@
+name: jobtrackr
+description: "JobTrackr - Track your tasks, time, and accomplishments."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # Local storage
+  sqflite: ^2.3.3+1
+  sqflite_common_ffi: ^2.3.3
+  sqflite_common_ffi_web: ^0.4.5
+  path: ^1.9.0
+  path_provider: ^2.1.4
+  shared_preferences: ^2.3.2
+
+  # UI helpers
+  intl: ^0.19.0
+  fl_chart: ^0.69.0
+  google_fonts: ^6.2.1
+
+  # Reports / export
+  pdf: ^3.11.1
+  printing: ^5.13.3
+  csv: ^6.0.0
+  share_plus: ^10.0.2
+
+  # IDs and files
+  uuid: ^4.5.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
