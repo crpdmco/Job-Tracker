@@ -1,12 +1,10 @@
 import 'dart:async';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
 import '../models/task_category.dart';
 import '../models/task.dart';
-import '../models/time_entry.dart';
 import '../services/db_service.dart';
-import '../utils/time_utils.dart';
+
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -35,23 +33,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     return FutureBuilder(
       future: Future.wait([
-        DbService.instance.getAllEntries(),
         DbService.instance.getTasks(),
         DbService.instance.getCategories(),
+        DbService.instance.getAllPeriods(),
         DbService.instance.getAllTaskCategories(),
       ]),
       builder: (context, snap) {
         if (!snap.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
-        final entries = snap.data![0] as List<TimeEntry>;
-        final tasks = snap.data![1] as List<Task>;
-        final categories = snap.data![2] as List<TaskCategory>;
+        final tasks = snap.data![0] as List<Task>;
+        final categories = snap.data![1] as List<TaskCategory>;
+        final periods = snap.data![2] as List;
         final taskCats = snap.data![3] as Map<String, List<TaskCategory>>;
         return _DashboardBody(
-            entries: entries,
             tasks: tasks,
             categories: categories,
+            periods: periods,
             taskCats: taskCats);
       },
     );
@@ -60,59 +58,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
 class _DashboardBody extends StatelessWidget {
   const _DashboardBody({
-    required this.entries,
     required this.tasks,
     required this.categories,
+    required this.periods,
     required this.taskCats,
   });
-  final List<TimeEntry> entries;
   final List<Task> tasks;
   final List<TaskCategory> categories;
+  final List periods;
   final Map<String, List<TaskCategory>> taskCats;
 
   @override
   Widget build(BuildContext context) {
-    final catMap = {for (final c in categories) c.id: c};
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final weekAgo = today.subtract(const Duration(days: 6));
-
-    final todayEntries = entries
-        .where((e) =>
-            e.startTime.year == today.year &&
-            e.startTime.month == today.month &&
-            e.startTime.day == today.day)
-        .toList();
-    final weekEntries =
-        entries.where((e) => e.startTime.isAfter(weekAgo)).toList();
-
-    final todayTotal = todayEntries.fold(Duration.zero, (a, e) => a + e.duration);
-    final weekTotal = weekEntries.fold(Duration.zero, (a, e) => a + e.duration);
-    final grandTotal = entries.fold(Duration.zero, (a, e) => a + e.duration);
-
-    // Last 7 days per-day
-    final perDay = <int, Duration>{};
-    for (var i = 0; i < 7; i++) {
-      perDay[i] = Duration.zero;
-    }
-    for (final e in weekEntries) {
-      final dayKey = DateTime(e.startTime.year, e.startTime.month, e.startTime.day);
-      final diff = dayKey.difference(weekAgo).inDays;
-      if (diff >= 0 && diff < 7) {
-        perDay[diff] = (perDay[diff] ?? Duration.zero) + e.duration;
-      }
-    }
-    final maxBar = perDay.values.fold<double>(
-        0, (m, d) => d.inMinutes > m ? d.inMinutes.toDouble() : m);
-    final chartMax = (maxBar == 0 ? 60.0 : (maxBar * 1.2));
-
-    // Per-category breakdown
-    final byCategory = <String, Duration>{};
-    for (final e in entries) {
-      final cats = taskCats[e.taskId] ?? [];
+    final byCategory = <String, int>{};
+    for (final t in tasks) {
+      final cats = taskCats[t.id] ?? [];
       for (final cat in cats) {
-        byCategory[cat.id] =
-            (byCategory[cat.id] ?? Duration.zero) + e.duration;
+        byCategory[cat.id] = (byCategory[cat.id] ?? 0) + 1;
       }
     }
     final catSorted = byCategory.entries.toList()
@@ -130,94 +92,27 @@ class _DashboardBody extends StatelessWidget {
           children: [
             Expanded(
                 child: _StatCard(
-                    label: 'Today',
-                    value: TimeUtils.formatHoursCompact(todayTotal),
-                    icon: Icons.today,
+                    label: 'Tasks',
+                    value: '${tasks.length}',
+                    icon: Icons.checklist,
                     color: Colors.blue)),
             const SizedBox(width: 10),
             Expanded(
                 child: _StatCard(
-                    label: 'This week',
-                    value: TimeUtils.formatHoursCompact(weekTotal),
+                    label: 'Dates',
+                    value: '${periods.length}',
                     icon: Icons.date_range,
                     color: Colors.purple)),
             const SizedBox(width: 10),
             Expanded(
                 child: _StatCard(
-                    label: 'All time',
-                    value: TimeUtils.formatHoursCompact(grandTotal),
-                    icon: Icons.access_time,
+                    label: 'Categories',
+                    value: '${categories.length}',
+                    icon: Icons.label,
                     color: Colors.teal)),
           ],
         ),
         const SizedBox(height: 24),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Last 7 days',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        )),
-                const SizedBox(height: 16),
-                SizedBox(
-                  height: 200,
-                  child: BarChart(
-                    BarChartData(
-                      maxY: chartMax,
-                      gridData: const FlGridData(show: false),
-                      borderData: FlBorderData(show: false),
-                      titlesData: FlTitlesData(
-                        show: true,
-                        topTitles: const AxisTitles(
-                            sideTitles: SideTitles(showTitles: false)),
-                        rightTitles: const AxisTitles(
-                            sideTitles: SideTitles(showTitles: false)),
-                        leftTitles: const AxisTitles(
-                            sideTitles: SideTitles(showTitles: false)),
-                        bottomTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 28,
-                            getTitlesWidget: (v, _) {
-                              final i = v.toInt();
-                              if (i < 0 || i > 6) return const SizedBox.shrink();
-                              final d = weekAgo.add(Duration(days: i));
-                              return Padding(
-                                padding: const EdgeInsets.only(top: 6),
-                                child: Text(
-                                  TimeUtils.formatWeekday(d),
-                                  style: const TextStyle(fontSize: 11),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                      barGroups: List.generate(7, (i) {
-                        final v = perDay[i]!.inMinutes.toDouble();
-                        return BarChartGroupData(
-                          x: i,
-                          barRods: [
-                            BarChartRodData(
-                              toY: v,
-                              color: Theme.of(context).colorScheme.primary,
-                              width: 18,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                          ],
-                        );
-                      }),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -232,14 +127,19 @@ class _DashboardBody extends StatelessWidget {
                 if (catSorted.isEmpty)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Text('No data yet.'),
+                    child: Text('No tasks with categories yet.'),
                   )
                 else
                   ...catSorted.map((entry) {
-                    final cat = catMap[entry.key];
-                    final pct = grandTotal.inSeconds == 0
+                    final cat = categories.firstWhere(
+                        (c) => c.id == entry.key,
+                        orElse: () => TaskCategory(
+                            id: '',
+                            name: 'Unknown',
+                            colorValue: 0xFF9E9E9E));
+                    final pct = tasks.isEmpty
                         ? 0.0
-                        : entry.value.inSeconds / grandTotal.inSeconds;
+                        : entry.value / tasks.length;
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: Column(
@@ -251,14 +151,14 @@ class _DashboardBody extends StatelessWidget {
                                 width: 12,
                                 height: 12,
                                 decoration: BoxDecoration(
-                                  color: cat?.color ?? Colors.grey,
+                                  color: cat.color,
                                   shape: BoxShape.circle,
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              Expanded(child: Text(cat?.name ?? 'Unknown')),
+                              Expanded(child: Text(cat.name)),
                               Text(
-                                  '${(pct * 100).toStringAsFixed(0)}%  ·  ${TimeUtils.formatHoursCompact(entry.value)}',
+                                  '${entry.value} task${entry.value == 1 ? '' : 's'}',
                                   style: const TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600)),
@@ -273,8 +173,7 @@ class _DashboardBody extends StatelessWidget {
                               backgroundColor: Theme.of(context)
                                   .colorScheme
                                   .surfaceContainerHigh,
-                              valueColor: AlwaysStoppedAnimation(
-                                  cat?.color ?? Colors.grey),
+                              valueColor: AlwaysStoppedAnimation(cat.color),
                             ),
                           ),
                         ],

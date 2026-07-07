@@ -8,7 +8,7 @@ import 'package:uuid/uuid.dart';
 import '../models/task_category.dart';
 import '../models/task.dart';
 import '../models/task_period.dart';
-import '../models/time_entry.dart';
+
 
 class DbService {
   DbService._();
@@ -76,16 +76,6 @@ class DbService {
         note TEXT,
         createdAt TEXT NOT NULL,
         FOREIGN KEY (taskId) REFERENCES tasks(id) ON DELETE CASCADE
-      )
-    ''');
-    await db.execute('''
-      CREATE TABLE time_entries (
-        id TEXT PRIMARY KEY,
-        taskId TEXT NOT NULL,
-        startTime TEXT NOT NULL,
-        endTime TEXT,
-        note TEXT,
-        createdAt TEXT NOT NULL
       )
     ''');
     await db.execute('''
@@ -261,7 +251,6 @@ class DbService {
       await db.delete('tasks', where: 'id = ?', whereArgs: [id]);
       await db.delete(
           'task_periods', where: 'taskId = ?', whereArgs: [id]);
-      await db.delete('time_entries', where: 'taskId = ?', whereArgs: [id]);
       await db.delete(
           'task_categories', where: 'taskId = ?', whereArgs: [id]);
       _changes.add(null);
@@ -395,110 +384,4 @@ class DbService {
     }
   }
 
-  // ---- Time entries ----
-  Future<List<TimeEntry>> getEntriesForTask(String taskId) async {
-    final db = await database;
-    final rows = await db.query(
-      'time_entries',
-      where: 'taskId = ?',
-      whereArgs: [taskId],
-      orderBy: 'startTime DESC',
-    );
-    return rows.map(TimeEntry.fromMap).toList();
-  }
-
-  Future<List<TimeEntry>> getAllEntries({DateTime? from, DateTime? to}) async {
-    final db = await database;
-    final where = <String>[];
-    final args = <Object?>[];
-    if (from != null) {
-      where.add('startTime >= ?');
-      args.add(from.toIso8601String());
-    }
-    if (to != null) {
-      where.add('startTime <= ?');
-      args.add(to.toIso8601String());
-    }
-    final rows = await db.query(
-      'time_entries',
-      where: where.isEmpty ? null : where.join(' AND '),
-      whereArgs: args.isEmpty ? null : args,
-      orderBy: 'startTime DESC',
-    );
-    return rows.map(TimeEntry.fromMap).toList();
-  }
-
-  Future<TimeEntry?> getActiveEntry() async {
-    final db = await database;
-    final rows = await db.query(
-      'time_entries',
-      where: 'endTime IS NULL',
-      orderBy: 'startTime DESC',
-      limit: 1,
-    );
-    if (rows.isEmpty) return null;
-    return TimeEntry.fromMap(rows.first);
-  }
-
-  Future<TimeEntry> startEntry(String taskId) async {
-    try {
-      final db = await database;
-      await db.update(
-        'time_entries',
-        {'endTime': DateTime.now().toIso8601String()},
-        where: 'endTime IS NULL',
-      );
-      final e = TimeEntry(
-        id: _uuid.v4(),
-        taskId: taskId,
-        startTime: DateTime.now(),
-        createdAt: DateTime.now(),
-      );
-      await db.insert('time_entries', e.toMap());
-      _changes.add(null);
-      return e;
-    } catch (e) {
-      _errors.add(e.toString());
-      rethrow;
-    }
-  }
-
-  Future<void> stopEntry(String id, {String? note}) async {
-    try {
-      final db = await database;
-      await db.update(
-        'time_entries',
-        {'endTime': DateTime.now().toIso8601String(), 'note': note},
-        where: 'id = ?',
-        whereArgs: [id],
-      );
-      _changes.add(null);
-    } catch (e) {
-      _errors.add(e.toString());
-      rethrow;
-    }
-  }
-
-  Future<void> deleteEntry(String id) async {
-    try {
-      final db = await database;
-      await db.delete('time_entries', where: 'id = ?', whereArgs: [id]);
-      _changes.add(null);
-    } catch (e) {
-      _errors.add(e.toString());
-      rethrow;
-    }
-  }
-
-  Future<void> updateEntry(TimeEntry e) async {
-    try {
-      final db = await database;
-      await db.update(
-          'time_entries', e.toMap(), where: 'id = ?', whereArgs: [e.id]);
-      _changes.add(null);
-    } catch (e) {
-      _errors.add(e.toString());
-      rethrow;
-    }
-  }
 }

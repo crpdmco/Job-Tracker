@@ -1,10 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../models/task_category.dart';
 import '../models/task.dart';
-import '../models/time_entry.dart';
 import '../services/db_service.dart';
 import '../utils/time_utils.dart';
 import '../widgets/task_category_chip.dart';
@@ -137,7 +135,6 @@ class _TasksTabState extends State<_TasksTab> {
       key: ValueKey(_refreshKey),
       future: Future.wait([
         db.getTasks(includeArchived: _showArchived),
-        db.getActiveEntry(),
         db.getAllTaskCategories(),
       ]),
       builder: (context, snap) {
@@ -145,8 +142,7 @@ class _TasksTabState extends State<_TasksTab> {
           return const Center(child: CircularProgressIndicator());
         }
         final tasks = (snap.data![0] as List<Task>);
-        final active = snap.data![1] as TimeEntry?;
-        final taskCats = snap.data![2] as Map<String, List<TaskCategory>>;
+        final taskCats = snap.data![1] as Map<String, List<TaskCategory>>;
         var filtered = tasks;
         if (_searchQuery.isNotEmpty) {
           filtered = filtered
@@ -168,105 +164,73 @@ class _TasksTabState extends State<_TasksTab> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text('Hello 👋',
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                    )),
-                            Text('Your tasks',
-                                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                    )),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineSmall
+                                    ?.copyWith(fontWeight: FontWeight.w700)),
+                            Text(
+                              tasks.length == 1
+                                  ? '1 task'
+                                  : '${tasks.length} tasks',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
                           ],
                         ),
                       ),
                       IconButton(
-                        onPressed: _refresh,
-                        icon: const Icon(Icons.refresh),
-                        tooltip: 'Refresh',
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              if (active != null)
-                SliverToBoxAdapter(
-                  child: _ActiveTimerCard(entry: active),
-                ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-                  child: TextField(
-                    controller: _searchCtrl,
-                    decoration: InputDecoration(
-                      hintText: 'Search tasks…',
-                      prefixIcon: const Icon(Icons.search, size: 20),
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear, size: 18),
-                              onPressed: () => _searchCtrl.clear(),
-                            )
-                          : null,
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 10),
-                    ),
-                  ),
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-                  child: Row(
-                    children: [
-                      const Spacer(),
-                      TextButton.icon(
                         onPressed: () =>
                             setState(() => _showArchived = !_showArchived),
                         icon: Icon(
                           _showArchived
                               ? Icons.archive
                               : Icons.archive_outlined,
-                          size: 16,
                         ),
-                        label: Text(
-                            _showArchived ? 'Showing archived' : 'Show archived',
-                            style: const TextStyle(fontSize: 12)),
+                        tooltip: _showArchived
+                            ? 'Hide archived'
+                            : 'Show archived',
                       ),
                     ],
                   ),
                 ),
               ),
-              if (filtered.isEmpty)
-                const SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: _EmptyState(),
-                )
-              else
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 100),
-                  sliver: SliverList.separated(
-                    itemCount: filtered.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 10),
-                    itemBuilder: (context, i) {
+              if (_searchCtrl.text.isNotEmpty)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+                    child: Text(
+                      '${filtered.length} result${filtered.length == 1 ? '' : 's'}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant),
+                    ),
+                  ),
+                ),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, i) {
                       final t = filtered[i];
                       return _TaskCard(
                         task: t,
                         categories: taskCats[t.id] ?? const [],
                       );
                     },
+                    childCount: filtered.length,
                   ),
                 ),
+              ),
+              if (filtered.isEmpty)
+                SliverFillRemaining(child: _emptyState(context)),
             ],
           ),
         );
       },
     );
   }
-}
 
-class _EmptyState extends StatelessWidget {
-  const _EmptyState();
-  @override
-  Widget build(BuildContext context) {
+  Widget _emptyState(BuildContext context) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(40),
@@ -280,106 +244,12 @@ class _EmptyState extends StatelessWidget {
             Text('No tasks yet',
                 style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 4),
-            Text('Tap "New Task" to start tracking your work.',
+            Text('Tap "New Task" to get started.',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium),
           ],
         ),
       ),
-    );
-  }
-}
-
-class _ActiveTimerCard extends StatefulWidget {
-  const _ActiveTimerCard({required this.entry});
-  final TimeEntry entry;
-
-  @override
-  State<_ActiveTimerCard> createState() => _ActiveTimerCardState();
-}
-
-class _ActiveTimerCardState extends State<_ActiveTimerCard> {
-  late Timer _timer;
-  @override
-  void initState() {
-    super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder(
-      future: DbService.instance.getTask(widget.entry.taskId),
-      builder: (context, snap) {
-        if (!snap.hasData) return const SizedBox.shrink();
-        final task = snap.data!;
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.fiber_manual_record,
-                        color: Colors.white, size: 14),
-                    const SizedBox(width: 6),
-                    const Text('LIVE TIMER',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 1.2)),
-                    const Spacer(),
-                    IconButton(
-                      onPressed: () async {
-                        HapticFeedback.mediumImpact();
-                        await DbService.instance.stopEntry(widget.entry.id);
-                        if (mounted) setState(() {});
-                      },
-                      icon: const Icon(Icons.stop_circle, color: Colors.white, size: 36),
-                      tooltip: 'Stop',
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(task.title,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700)),
-                const SizedBox(height: 12),
-                Text(TimeUtils.formatDuration(widget.entry.duration),
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 38,
-                        fontWeight: FontWeight.w300,
-                        fontFeatures: [FontFeature.tabularFigures()])),
-                const SizedBox(height: 8),
-                Text('Started at ${TimeUtils.formatTime(widget.entry.startTime)}',
-                    style: const TextStyle(color: Colors.white70, fontSize: 12)),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 }
@@ -411,7 +281,8 @@ class _TaskCard extends StatelessWidget {
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Delete task?'),
-            content: const Text('This will also remove all its time entries.'),
+            content: const Text(
+                'This will also remove all associated dates.'),
             actions: [
               TextButton(
                   onPressed: () => Navigator.pop(ctx, false),
@@ -433,19 +304,6 @@ class _TaskCard extends StatelessWidget {
               MaterialPageRoute(
                   builder: (_) => TaskDetailScreen(taskId: task.id)),
             );
-          },
-          onLongPress: () async {
-            HapticFeedback.mediumImpact();
-            try {
-              await DbService.instance.startEntry(task.id);
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('Timer started'),
-                      duration: Duration(seconds: 1)),
-                );
-              }
-            } catch (_) {}
           },
           child: Padding(
             padding: const EdgeInsets.all(14),
@@ -494,24 +352,6 @@ class _TaskCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                ),
-                IconButton(
-                  onPressed: () async {
-                    HapticFeedback.mediumImpact();
-                    try {
-                      await DbService.instance.startEntry(task.id);
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('Timer started'),
-                              duration: Duration(seconds: 1)),
-                        );
-                      }
-                    } catch (_) {}
-                  },
-                  icon: const Icon(Icons.play_circle_filled, size: 32),
-                  color: Theme.of(context).colorScheme.primary,
-                  tooltip: 'Start timer',
                 ),
               ],
             ),
