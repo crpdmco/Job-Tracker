@@ -324,6 +324,23 @@ class DbService {
   }
 
   // ---- Task periods ----
+  Future<List<TaskPeriod>> getAllPeriods({DateTime? from, DateTime? to}) async {
+    final db = await database;
+    String? where;
+    List<dynamic>? whereArgs;
+    if (from != null && to != null) {
+      where = 'startDate >= ? AND startDate <= ?';
+      whereArgs = [from.toIso8601String(), to.toIso8601String()];
+    }
+    final rows = await db.query(
+      'task_periods',
+      where: where,
+      whereArgs: whereArgs,
+      orderBy: 'startDate ASC',
+    );
+    return rows.map(TaskPeriod.fromMap).toList();
+  }
+
   Future<List<TaskPeriod>> getPeriodsForTask(String taskId) async {
     final db = await database;
     final rows = await db.query(

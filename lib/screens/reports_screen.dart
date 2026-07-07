@@ -54,11 +54,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
       final db = DbService.instance;
       final tasks = await db.getTasks(includeArchived: true);
       final categories = await db.getCategories();
-      final entries = await db.getAllEntries(from: _from, to: _to);
-      if (entries.isEmpty) {
+      final periods = await db.getAllPeriods(from: _from, to: _to);
+      if (periods.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No sessions in this period.')),
+            const SnackBar(content: Text('No periods in this date range.')),
           );
         }
         return;
@@ -69,16 +69,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ? await svc.generatePdf(
               tasks: tasks,
               categories: categories,
-              entries: entries,
+              periods: periods,
               from: _from,
               to: _to,
               taskCats: taskCats,
             )
           : await svc.generateCsv(
               tasks: tasks,
-              entries: entries,
+              periods: periods,
               from: _from,
               to: _to,
+              taskCats: taskCats,
             );
       if (mounted) {
         await svc.share(path);
