@@ -106,7 +106,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 )),
         const SizedBox(height: 8),
         Text(
-          'Generate an accomplishment report from your time entries.',
+          'Generate an accomplishment report listing tasks, dates, categories, and descriptions.',
           style: Theme.of(context).textTheme.bodyMedium,
         ),
         const SizedBox(height: 20),
@@ -162,7 +162,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         FilledButton.icon(
           onPressed: _busy ? null : () => _export(pdf: true),
           icon: const Icon(Icons.picture_as_pdf),
-          label: const Text('Export PDF report'),
+          label: const Text('Generate PDF report'),
           style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(54)),
         ),
