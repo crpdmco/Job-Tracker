@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/db_service.dart';
 import '../services/report_service.dart';
@@ -65,6 +66,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
       }
       final svc = ReportService();
       final taskCats = await db.getAllTaskCategories();
+      final prefs = await SharedPreferences.getInstance();
+      final empName = prefs.getString('employee_name') ?? '';
+      final empId = prefs.getString('employee_id') ?? '';
+      final empTeam = prefs.getString('employee_team') ?? '';
       final path = pdf
           ? await svc.generatePdf(
               tasks: tasks,
@@ -72,6 +77,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
               periods: periods,
               from: _from,
               to: _to,
+              employeeName: empName,
+              employeeId: empId,
+              employeeTeam: empTeam,
               taskCats: taskCats,
             )
           : await svc.generateCsv(
@@ -79,6 +87,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
               periods: periods,
               from: _from,
               to: _to,
+              employeeName: empName,
+              employeeId: empId,
+              employeeTeam: empTeam,
               taskCats: taskCats,
             );
       if (mounted) {

@@ -10,7 +10,7 @@ import 'task_form_screen.dart';
 import 'task_detail_screen.dart';
 import 'reports_screen.dart';
 import 'categories_screen.dart';
-import 'dashboard_screen.dart';
+import 'employee_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -53,7 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final pages = [
       const _TasksTab(),
-      const DashboardScreen(),
+      const EmployeeScreen(),
       const CategoriesScreen(),
       const ReportsScreen(),
     ];
@@ -81,9 +81,9 @@ class _HomeScreenState extends State<HomeScreen> {
               selectedIcon: Icon(Icons.checklist),
               label: 'Tasks'),
           NavigationDestination(
-              icon: Icon(Icons.bar_chart_outlined),
-              selectedIcon: Icon(Icons.bar_chart),
-              label: 'Dashboard'),
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person),
+              label: 'Employee'),
           NavigationDestination(
               icon: Icon(Icons.label_outline),
               selectedIcon: Icon(Icons.label),

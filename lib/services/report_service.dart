@@ -24,6 +24,9 @@ class ReportService {
     required List<TaskPeriod> periods,
     required DateTime from,
     required DateTime to,
+    String employeeName = '',
+    String employeeId = '',
+    String employeeTeam = '',
     Map<String, List<TaskCategory>>? taskCats,
   }) async {
     final periodsByTask = <String, List<TaskPeriod>>{};
@@ -42,73 +45,30 @@ class ReportService {
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Text('JobTrackr — Accomplishment Report',
+                pw.Text('Job Accomplishments',
                     style: pw.TextStyle(
                         fontSize: 22, fontWeight: pw.FontWeight.bold)),
                 pw.SizedBox(height: 4),
                 pw.Text(
-                  '${_formatDate(from)}  →  ${_formatDate(to)}',
+                  'From ${_formatMonthYear(from)}  To  ${_formatMonthYear(to)}',
                   style: const pw.TextStyle(fontSize: 12, color: PdfColors.grey700),
                 ),
+                pw.SizedBox(height: 8),
+                if (employeeName.isNotEmpty)
+                  pw.Text('Name: $employeeName',
+                      style: const pw.TextStyle(fontSize: 11)),
+                if (employeeId.isNotEmpty)
+                  pw.Text('ID: $employeeId',
+                      style: const pw.TextStyle(fontSize: 11)),
+                if (employeeTeam.isNotEmpty)
+                  pw.Text('Team: $employeeTeam',
+                      style: const pw.TextStyle(fontSize: 11)),
                 pw.Divider(),
               ],
             ),
           ),
           pw.SizedBox(height: 12),
-          pw.Container(
-            padding: const pw.EdgeInsets.all(12),
-            decoration: pw.BoxDecoration(
-              color: PdfColors.blue50,
-              borderRadius: pw.BorderRadius.circular(8),
-            ),
-            child: pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                _summaryCol('Tasks', '${tasks.length}'),
-                _summaryCol('Periods', '${periods.length}'),
-              ],
-            ),
-          ),
-          pw.SizedBox(height: 20),
-          ...tasks.expand((t) {
-            final tPeriods = periodsByTask[t.id] ?? [];
-            final cats = taskCats?[t.id] ?? [];
-            final catNames = cats.map((c) => c.name).join(', ');
-            final children = <pw.Widget>[
-              pw.SizedBox(height: 6),
-              pw.Text('• ${t.title}',
-                  style: pw.TextStyle(
-                      fontWeight: pw.FontWeight.bold, fontSize: 13)),
-              pw.SizedBox(height: 4),
-              ...tPeriods.map((tp) {
-                final line = tp.isSingleDay
-                    ? _formatDate(tp.startDate)
-                    : '${_formatDate(tp.startDate)} — ${_formatDate(tp.endDate!)}';
-                return pw.Padding(
-                  padding: const pw.EdgeInsets.only(left: 14),
-                  child: pw.Text('  - $line',
-                      style: const pw.TextStyle(fontSize: 11)),
-                );
-              }),
-            ];
-            if (catNames.isNotEmpty) {
-              children.add(pw.Padding(
-                padding: const pw.EdgeInsets.only(left: 14, top: 4),
-                child: pw.Text(catNames,
-                    style: pw.TextStyle(
-                        fontSize: 10, color: PdfColors.grey700)),
-              ));
-            }
-            if (t.description != null && t.description!.isNotEmpty) {
-              children.add(pw.Padding(
-                padding: const pw.EdgeInsets.only(left: 14, top: 1),
-                child: pw.Text(t.description!,
-                    style: const pw.TextStyle(fontSize: 10)),
-              ));
-            }
-            children.add(pw.SizedBox(height: 8));
-            return children;
-          }),
+          _buildTable(tasks, periodsByTask, taskCats),
         ],
       ),
     );
@@ -120,40 +80,79 @@ class ReportService {
     return file.path;
   }
 
-  static pw.Widget _summaryCol(String label, String value) => pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Text(value,
-              style: pw.TextStyle(
-                  fontSize: 16, fontWeight: pw.FontWeight.bold)),
-          pw.Text(label, style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
-        ],
-      );
+  pw.Widget _buildTable(
+    List<Task> tasks,
+    Map<String, List<TaskPeriod>> periodsByTask,
+    Map<String, List<TaskCategory>>? taskCats,
+  ) {
+    final headers = ['Task', 'Category', 'Sessions', 'Description'];
+    final rows = <List<String>>[];
+
+    for (final t in tasks) {
+      final tPeriods = periodsByTask[t.id] ?? [];
+      if (tPeriods.isEmpty) continue;
+      final cats = taskCats?[t.id] ?? [];
+      final catNames = cats.map((c) => c.name).join(', ');
+      final sessions = tPeriods.map((tp) {
+        return tp.isSingleDay
+            ? _formatDate(tp.startDate)
+            : '${_formatDate(tp.startDate)} — ${_formatDate(tp.endDate!)}';
+      }).join('\n');
+      rows.add([
+        t.title,
+        catNames,
+        sessions,
+        t.description ?? '',
+      ]);
+    }
+
+    return pw.TableHelper.fromTextArray(
+      headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
+      headerDecoration: const pw.BoxDecoration(color: PdfColors.grey200),
+      cellAlignment: pw.Alignment.topLeft,
+      cellPadding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      headerPadding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+      headers: headers,
+      data: rows.map((r) => r as List<dynamic>).toList(),
+      columnWidths: {
+        0: const pw.FlexColumnWidth(2),
+        1: const pw.FlexColumnWidth(1.5),
+        2: const pw.FlexColumnWidth(2.5),
+        3: const pw.FlexColumnWidth(3),
+      },
+    );
+  }
 
   Future<String> generateCsv({
     required List<Task> tasks,
     required List<TaskPeriod> periods,
     required DateTime from,
     required DateTime to,
+    String employeeName = '',
+    String employeeId = '',
+    String employeeTeam = '',
     Map<String, List<TaskCategory>>? taskCats,
   }) async {
     final rows = <List<dynamic>>[
-      ['Task', 'Date(s)', 'Categories', 'Description'],
+      ['Job Accomplishments'],
+      ['From ${_formatMonthYear(from)}  To  ${_formatMonthYear(to)}'],
+      if (employeeName.isNotEmpty) ['Name: $employeeName'],
+      if (employeeId.isNotEmpty) ['ID: $employeeId'],
+      if (employeeTeam.isNotEmpty) ['Team: $employeeTeam'],
+      [],
+      ['Task', 'Category', 'Sessions', 'Description'],
     ];
     for (final t in tasks) {
       final tPeriods = periods.where((p) => p.taskId == t.id).toList();
+      if (tPeriods.isEmpty) continue;
       final cats = taskCats?[t.id] ?? [];
       final catNames = cats.map((c) => c.name).join('; ');
-      for (final tp in tPeriods) {
-        rows.add([
-          t.title,
-          tp.isSingleDay
-              ? _formatDate(tp.startDate)
-              : '${_formatDate(tp.startDate)} — ${_formatDate(tp.endDate!)}',
-          catNames,
-          t.description ?? '',
-        ]);
-      }
+      final sessions = tPeriods.map((tp) {
+        return tp.isSingleDay
+            ? _formatDate(tp.startDate)
+            : '${_formatDate(tp.startDate)} — ${_formatDate(tp.endDate!)}';
+      }).join('\n');
+      rows.add([t.title, catNames, sessions, t.description ?? '']);
     }
     final csv = ListToCsvConverter().convert(rows);
     final dir = await _ensureDir();
@@ -169,9 +168,9 @@ class ReportService {
   }
 
   String _formatDate(DateTime d) => DateFormat('MMMM d, yyyy').format(d);
+  String _formatMonthYear(DateTime d) => DateFormat('MMMM yyyy').format(d);
 }
 
-// Simple CSV converter (avoids dependency on csv package for ListToCsvConverter)
 class ListToCsvConverter {
   String convert(List<List<dynamic>> rows) {
     final buf = StringBuffer();
