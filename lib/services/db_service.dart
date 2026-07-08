@@ -318,8 +318,8 @@ class DbService {
     String? where;
     List<dynamic>? whereArgs;
     if (from != null && to != null) {
-      where = 'startDate >= ? AND startDate <= ?';
-      whereArgs = [from.toIso8601String(), to.toIso8601String()];
+      where = 'startDate <= ? AND COALESCE(endDate, startDate) >= ?';
+      whereArgs = [to.toIso8601String(), from.toIso8601String()];
     }
     final rows = await db.query(
       'task_periods',

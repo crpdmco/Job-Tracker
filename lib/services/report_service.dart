@@ -34,6 +34,13 @@ class ReportService {
       periodsByTask.putIfAbsent(p.taskId, () => []).add(p);
     }
 
+    final dataFrom = periods
+        .map((p) => p.startDate)
+        .reduce((a, b) => a.isBefore(b) ? a : b);
+    final dataTo = periods
+        .map((p) => p.endDate ?? p.startDate)
+        .reduce((a, b) => a.isAfter(b) ? a : b);
+
     final doc = pw.Document();
     doc.addPage(
       pw.MultiPage(
@@ -50,7 +57,7 @@ class ReportService {
                         fontSize: 22, fontWeight: pw.FontWeight.bold)),
                 pw.SizedBox(height: 4),
                 pw.Text(
-                  'From ${_formatDate(from)}  To  ${_formatDate(to)}',
+                  'From ${_formatMonthYear(dataFrom)}  To  ${_formatMonthYear(dataTo)}',
                   style: const pw.TextStyle(fontSize: 12, color: PdfColors.grey700),
                 ),
                 pw.SizedBox(height: 8),
@@ -161,9 +168,15 @@ class ReportService {
     String employeeTeam = '',
     Map<String, List<TaskCategory>>? taskCats,
   }) async {
+    final dataFrom = periods
+        .map((p) => p.startDate)
+        .reduce((a, b) => a.isBefore(b) ? a : b);
+    final dataTo = periods
+        .map((p) => p.endDate ?? p.startDate)
+        .reduce((a, b) => a.isAfter(b) ? a : b);
     final rows = <List<dynamic>>[
       ['Job Accomplishments Report'],
-      ['From ${_formatDate(from)}  To  ${_formatDate(to)}'],
+      ['From ${_formatMonthYear(dataFrom)}  To  ${_formatMonthYear(dataTo)}'],
       if (employeeName.isNotEmpty) ['Name: $employeeName'],
       if (employeeId.isNotEmpty) ['ID: $employeeId'],
       if (employeeTeam.isNotEmpty) ['Team: $employeeTeam'],
@@ -196,6 +209,7 @@ class ReportService {
   }
 
   String _formatDate(DateTime d) => DateFormat('MMMM d, yyyy').format(d);
+  String _formatMonthYear(DateTime d) => DateFormat('MMMM yyyy').format(d);
 }
 
 class ListToCsvConverter {
