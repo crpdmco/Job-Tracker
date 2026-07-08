@@ -212,9 +212,15 @@ class _TasksTabState extends State<_TasksTab> {
                   delegate: SliverChildBuilderDelegate(
                     (context, i) {
                       final t = filtered[i];
-                      return _TaskCard(
-                        task: t,
-                        categories: taskCats[t.id] ?? const [],
+                      return Padding(
+                        padding: EdgeInsets.only(
+                          top: i == 0 ? 4 : 0,
+                          bottom: 8,
+                        ),
+                        child: _TaskCard(
+                          task: t,
+                          categories: taskCats[t.id] ?? const [],
+                        ),
                       );
                     },
                     childCount: filtered.length,

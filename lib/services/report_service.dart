@@ -45,12 +45,12 @@ class ReportService {
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Text('Job Accomplishments',
+                pw.Text('Job Accomplishments Report',
                     style: pw.TextStyle(
                         fontSize: 22, fontWeight: pw.FontWeight.bold)),
                 pw.SizedBox(height: 4),
                 pw.Text(
-                  'From ${_formatMonthYear(from)}  To  ${_formatMonthYear(to)}',
+                  'From ${_formatDate(from)}  To  ${_formatDate(to)}',
                   style: const pw.TextStyle(fontSize: 12, color: PdfColors.grey700),
                 ),
                 pw.SizedBox(height: 8),
@@ -85,41 +85,69 @@ class ReportService {
     Map<String, List<TaskPeriod>> periodsByTask,
     Map<String, List<TaskCategory>>? taskCats,
   ) {
-    final headers = ['Task', 'Category', 'Sessions', 'Description'];
-    final rows = <List<String>>[];
+    final cellStyle = pw.TextStyle(fontSize: 9);
+    final headerStyle = pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold);
+    const cellPad = pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4);
 
+    pw.Widget cell(String text) => pw.Padding(
+          padding: cellPad,
+          child: pw.Text(text, style: cellStyle),
+        );
+
+    pw.Widget headerCell(String text) => pw.Padding(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+          child: pw.Text(text, style: headerStyle),
+        );
+
+    pw.Widget sessionsCell(List<TaskPeriod> tPeriods) {
+      final lines = tPeriods.map((tp) {
+        return tp.isSingleDay
+            ? _formatDate(tp.startDate)
+            : '${_formatDate(tp.startDate)} — ${_formatDate(tp.endDate!)}';
+      }).toList();
+      return pw.Padding(
+        padding: cellPad,
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: lines.map((l) => pw.Text(l, style: cellStyle)).toList(),
+        ),
+      );
+    }
+
+    final header = pw.TableRow(
+      decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+      children: [
+        headerCell('Task'),
+        headerCell('Category'),
+        headerCell('Sessions'),
+        headerCell('Description'),
+      ],
+    );
+
+    final dataRows = <pw.TableRow>[];
     for (final t in tasks) {
       final tPeriods = periodsByTask[t.id] ?? [];
       if (tPeriods.isEmpty) continue;
       final cats = taskCats?[t.id] ?? [];
       final catNames = cats.map((c) => c.name).join(', ');
-      final sessions = tPeriods.map((tp) {
-        return tp.isSingleDay
-            ? _formatDate(tp.startDate)
-            : '${_formatDate(tp.startDate)} — ${_formatDate(tp.endDate!)}';
-      }).join('\n');
-      rows.add([
-        t.title,
-        catNames,
-        sessions,
-        t.description ?? '',
-      ]);
+      dataRows.add(pw.TableRow(
+        children: [
+          cell(t.title),
+          cell(catNames),
+          sessionsCell(tPeriods),
+          cell(t.description ?? ''),
+        ],
+      ));
     }
 
-    return pw.TableHelper.fromTextArray(
-      headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
-      headerDecoration: const pw.BoxDecoration(color: PdfColors.grey200),
-      cellAlignment: pw.Alignment.topLeft,
-      cellPadding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-      headerPadding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-      headers: headers,
-      data: rows.map((r) => r as List<dynamic>).toList(),
+    return pw.Table(
       columnWidths: {
         0: const pw.FlexColumnWidth(2),
         1: const pw.FlexColumnWidth(1.5),
         2: const pw.FlexColumnWidth(2.5),
         3: const pw.FlexColumnWidth(3),
       },
+      children: [header, ...dataRows],
     );
   }
 
@@ -134,8 +162,8 @@ class ReportService {
     Map<String, List<TaskCategory>>? taskCats,
   }) async {
     final rows = <List<dynamic>>[
-      ['Job Accomplishments'],
-      ['From ${_formatMonthYear(from)}  To  ${_formatMonthYear(to)}'],
+      ['Job Accomplishments Report'],
+      ['From ${_formatDate(from)}  To  ${_formatDate(to)}'],
       if (employeeName.isNotEmpty) ['Name: $employeeName'],
       if (employeeId.isNotEmpty) ['ID: $employeeId'],
       if (employeeTeam.isNotEmpty) ['Team: $employeeTeam'],
@@ -168,7 +196,6 @@ class ReportService {
   }
 
   String _formatDate(DateTime d) => DateFormat('MMMM d, yyyy').format(d);
-  String _formatMonthYear(DateTime d) => DateFormat('MMMM yyyy').format(d);
 }
 
 class ListToCsvConverter {
