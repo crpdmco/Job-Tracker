@@ -92,27 +92,40 @@ class ReportService {
     Map<String, List<TaskPeriod>> periodsByTask,
     Map<String, List<TaskCategory>>? taskCats,
   ) {
-    final cellStyle = pw.TextStyle(fontSize: 9);
-    final headerStyle = pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold);
+    const border = pw.Border(
+      left: pw.BorderSide(width: 0.5, color: PdfColors.grey400),
+      right: pw.BorderSide(width: 0.5, color: PdfColors.grey400),
+      top: pw.BorderSide(width: 0.5, color: PdfColors.grey400),
+      bottom: pw.BorderSide(width: 0.5, color: PdfColors.grey400),
+    );
     const cellPad = pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4);
+    const cellStyle = pw.TextStyle(fontSize: 9);
+    final headerStyle = pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold);
 
-    pw.Widget cell(String text) => pw.Padding(
+    pw.Widget cell(String text) => pw.Container(
+          decoration: pw.BoxDecoration(border: border),
           padding: cellPad,
           child: pw.Text(text, style: cellStyle),
         );
 
-    pw.Widget headerCell(String text) => pw.Padding(
+    pw.Widget headerCell(String text) => pw.Container(
+          decoration: pw.BoxDecoration(
+            border: border,
+            color: PdfColors.grey200,
+          ),
           padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
           child: pw.Text(text, style: headerStyle),
         );
 
     pw.Widget sessionsCell(List<TaskPeriod> tPeriods) {
       final lines = tPeriods.map((tp) {
-        return tp.isSingleDay
+        final date = tp.isSingleDay
             ? _formatDate(tp.startDate)
-            : '${_formatDate(tp.startDate)} — ${_formatDate(tp.endDate!)}';
+            : '${_formatDate(tp.startDate)} - ${_formatDate(tp.endDate!)}';
+        return '- $date';
       }).toList();
-      return pw.Padding(
+      return pw.Container(
+        decoration: pw.BoxDecoration(border: border),
         padding: cellPad,
         child: pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -121,15 +134,12 @@ class ReportService {
       );
     }
 
-    final header = pw.TableRow(
-      decoration: const pw.BoxDecoration(color: PdfColors.grey200),
-      children: [
-        headerCell('Task'),
-        headerCell('Category'),
-        headerCell('Sessions'),
-        headerCell('Description'),
-      ],
-    );
+    final header = pw.TableRow(children: [
+      headerCell('Task'),
+      headerCell('Category'),
+      headerCell('Sessions'),
+      headerCell('Description'),
+    ]);
 
     final dataRows = <pw.TableRow>[];
     for (final t in tasks) {
@@ -189,9 +199,10 @@ class ReportService {
       final cats = taskCats?[t.id] ?? [];
       final catNames = cats.map((c) => c.name).join('; ');
       final sessions = tPeriods.map((tp) {
-        return tp.isSingleDay
+        final date = tp.isSingleDay
             ? _formatDate(tp.startDate)
-            : '${_formatDate(tp.startDate)} — ${_formatDate(tp.endDate!)}';
+            : '${_formatDate(tp.startDate)} - ${_formatDate(tp.endDate!)}';
+        return '- $date';
       }).join('\n');
       rows.add([t.title, catNames, sessions, t.description ?? '']);
     }

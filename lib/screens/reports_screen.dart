@@ -21,10 +21,31 @@ class _ReportsScreenState extends State<ReportsScreen> {
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    _to = DateTime(now.year, now.month, now.day, 23, 59, 59);
-    _from = DateTime(now.year, now.month, now.day)
-        .subtract(const Duration(days: 30));
+    _from = DateTime(2020, 1, 1);
+    _to = DateTime(2100, 1, 1);
+    _loadDefaultRange();
+  }
+
+  Future<void> _loadDefaultRange() async {
+    final db = DbService.instance;
+    final all = await db.getAllPeriods();
+    if (all.isEmpty) {
+      final now = DateTime.now();
+      _from = DateTime(now.year, now.month, now.day)
+          .subtract(const Duration(days: 30));
+      _to = DateTime(now.year, now.month, now.day, 23, 59, 59);
+    } else {
+      final starts = all.map((p) => p.startDate);
+      final ends = all.map((p) => p.endDate ?? p.startDate);
+      _from = DateTime(
+          starts.reduce((a, b) => a.isBefore(b) ? a : b).year,
+          starts.reduce((a, b) => a.isBefore(b) ? a : b).month, 1);
+      _to = DateTime(
+          ends.reduce((a, b) => a.isAfter(b) ? a : b).year,
+          ends.reduce((a, b) => a.isAfter(b) ? a : b).month + 1, 0,
+          23, 59, 59);
+    }
+    if (mounted) setState(() {});
   }
 
   Future<void> _pickRange() async {
