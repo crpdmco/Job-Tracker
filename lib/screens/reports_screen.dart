@@ -114,13 +114,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
               taskCats: taskCats,
             );
       if (mounted) {
-        await svc.share(path);
-        if (mounted) {
-          final name = path.split(Platform.pathSeparator).last;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Report saved: $name')),
-          );
-        }
+        final name = path.split(Platform.pathSeparator).last;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Report saved: $name')),
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);

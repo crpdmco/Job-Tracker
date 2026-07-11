@@ -1,23 +1,14 @@
 import 'dart:io';
+import 'package:file_selector/file_selector.dart';
 import 'package:intl/intl.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:share_plus/share_plus.dart';
 
 import '../models/task_category.dart';
 import '../models/task.dart';
 import '../models/task_period.dart';
 
 class ReportService {
-  Future<Directory> _ensureDir() async {
-    final base = await getApplicationDocumentsDirectory();
-    final dir = Directory(p.join(base.path, 'reports'));
-    if (!dir.existsSync()) dir.createSync(recursive: true);
-    return dir;
-  }
-
   Future<String> generatePdf({
     required List<Task> tasks,
     required List<TaskCategory> categories,
@@ -80,11 +71,17 @@ class ReportService {
       ),
     );
 
-    final dir = await _ensureDir();
-    final file = File(p.join(dir.path,
-        'jobtrackr_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}.pdf'));
-    await file.writeAsBytes(await doc.save());
-    return file.path;
+    final bytes = await doc.save();
+    final loc = await getSaveLocation(
+      suggestedName:
+          'jobtrackr_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}.pdf',
+      acceptedTypeGroups: [
+        XTypeGroup(label: 'PDF', extensions: ['pdf']),
+      ],
+    );
+    if (loc == null) throw Exception('Save cancelled');
+    await File(loc.path).writeAsBytes(bytes);
+    return loc.path;
   }
 
   pw.Widget _buildTable(
@@ -92,27 +89,21 @@ class ReportService {
     Map<String, List<TaskPeriod>> periodsByTask,
     Map<String, List<TaskCategory>>? taskCats,
   ) {
-    const border = pw.Border(
-      left: pw.BorderSide(width: 0.5, color: PdfColors.grey400),
-      right: pw.BorderSide(width: 0.5, color: PdfColors.grey400),
-      top: pw.BorderSide(width: 0.5, color: PdfColors.grey400),
-      bottom: pw.BorderSide(width: 0.5, color: PdfColors.grey400),
-    );
     const cellPad = pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4);
     const cellStyle = pw.TextStyle(fontSize: 9);
     final headerStyle = pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold);
+    final tableBorder = pw.TableBorder.all(
+      color: PdfColors.grey400,
+      width: 0.5,
+    );
 
-    pw.Widget cell(String text) => pw.Container(
-          decoration: pw.BoxDecoration(border: border),
+    pw.Widget cell(String text) => pw.Padding(
           padding: cellPad,
           child: pw.Text(text, style: cellStyle),
         );
 
     pw.Widget headerCell(String text) => pw.Container(
-          decoration: pw.BoxDecoration(
-            border: border,
-            color: PdfColors.grey200,
-          ),
+          decoration: const pw.BoxDecoration(color: PdfColors.grey200),
           padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
           child: pw.Text(text, style: headerStyle),
         );
@@ -124,8 +115,7 @@ class ReportService {
             : '${_formatDate(tp.startDate)} - ${_formatDate(tp.endDate!)}';
         return '- $date';
       }).toList();
-      return pw.Container(
-        decoration: pw.BoxDecoration(border: border),
+      return pw.Padding(
         padding: cellPad,
         child: pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -158,6 +148,7 @@ class ReportService {
     }
 
     return pw.Table(
+      border: tableBorder,
       columnWidths: {
         0: const pw.FlexColumnWidth(2),
         1: const pw.FlexColumnWidth(1.5),
@@ -207,16 +198,16 @@ class ReportService {
       rows.add([t.title, catNames, sessions, t.description ?? '']);
     }
     final csv = ListToCsvConverter().convert(rows);
-    final dir = await _ensureDir();
-    final file = File(p.join(dir.path,
-        'jobtrackr_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}.csv'));
-    await file.writeAsString(csv);
-    return file.path;
-  }
-
-  Future<void> share(String filePath) async {
-    if (!File(filePath).existsSync()) return;
-    await Share.shareXFiles([XFile(filePath)], text: 'JobTrackr report');
+    final loc = await getSaveLocation(
+      suggestedName:
+          'jobtrackr_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}.csv',
+      acceptedTypeGroups: [
+        XTypeGroup(label: 'CSV', extensions: ['csv']),
+      ],
+    );
+    if (loc == null) throw Exception('Save cancelled');
+    await File(loc.path).writeAsString(csv);
+    return loc.path;
   }
 
   String _formatDate(DateTime d) => DateFormat('MMMM d, yyyy').format(d);
