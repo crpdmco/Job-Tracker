@@ -62,13 +62,13 @@ class ReportService {
                 ),
                 pw.SizedBox(height: 8),
                 if (employeeName.isNotEmpty)
-                  pw.Text('Name: $employeeName',
+                  pw.Text('Name: ${_sanitize(employeeName)}',
                       style: const pw.TextStyle(fontSize: 11)),
                 if (employeeId.isNotEmpty)
-                  pw.Text('ID: $employeeId',
+                  pw.Text('ID: ${_sanitize(employeeId)}',
                       style: const pw.TextStyle(fontSize: 11)),
                 if (employeeTeam.isNotEmpty)
-                  pw.Text('Team: $employeeTeam',
+                  pw.Text('Team: ${_sanitize(employeeTeam)}',
                       style: const pw.TextStyle(fontSize: 11)),
                 pw.Divider(),
               ],
@@ -100,15 +100,17 @@ class ReportService {
       width: 0.5,
     );
 
+    String s(String text) => _sanitize(text);
+
     pw.Widget cell(String text) => pw.Padding(
           padding: cellPad,
-          child: pw.Text(text, style: cellStyle),
+          child: pw.Text(s(text), style: cellStyle),
         );
 
     pw.Widget headerCell(String text) => pw.Container(
           decoration: const pw.BoxDecoration(color: PdfColors.grey200),
           padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-          child: pw.Text(text, style: headerStyle),
+          child: pw.Text(s(text), style: headerStyle),
         );
 
     pw.Widget sessionsCell(List<TaskPeriod> tPeriods) {
@@ -122,7 +124,7 @@ class ReportService {
         padding: cellPad,
         child: pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: lines.map((l) => pw.Text(l, style: cellStyle)).toList(),
+          children: lines.map((l) => pw.Text(s(l), style: cellStyle)).toList(),
         ),
       );
     }
@@ -211,6 +213,19 @@ class ReportService {
   Future<void> share(String filePath) async {
     if (!File(filePath).existsSync()) return;
     await Share.shareXFiles([XFile(filePath)], text: 'JobTrackr report');
+  }
+
+  String _sanitize(String s) {
+    return s
+        .replaceAll('\u2018', "'")
+        .replaceAll('\u2019', "'")
+        .replaceAll('\u201c', '"')
+        .replaceAll('\u201d', '"')
+        .replaceAll('\u2013', '-')
+        .replaceAll('\u2014', '-')
+        .replaceAll('\u2022', '-')
+        .replaceAll('\u2026', '...')
+        .replaceAll('\u00a0', ' ');
   }
 
   String _formatDate(DateTime d) => DateFormat('MMMM d, yyyy').format(d);
