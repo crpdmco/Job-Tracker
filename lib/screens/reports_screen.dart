@@ -114,7 +114,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
               taskCats: taskCats,
             );
       if (mounted) {
-        await svc.share(path);
+        final RenderBox? box =
+            context.findRenderObject() as RenderBox?;
+        final origin = box?.hasSize == true
+            ? box!.localToGlobal(Offset.zero) & box.size
+            : null;
+        await svc.share(path, sharePositionOrigin: origin);
         if (mounted) {
           final name = path.split(Platform.pathSeparator).last;
           ScaffoldMessenger.of(context).showSnackBar(

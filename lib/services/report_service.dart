@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' show Rect;
 import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -210,9 +211,13 @@ class ReportService {
     return file.path;
   }
 
-  Future<void> share(String filePath) async {
+  Future<void> share(String filePath, {Rect? sharePositionOrigin}) async {
     if (!File(filePath).existsSync()) return;
-    await Share.shareXFiles([XFile(filePath)], text: 'JobTrackr report');
+    await Share.shareXFiles(
+      [XFile(filePath)],
+      text: 'JobTrackr report',
+      sharePositionOrigin: sharePositionOrigin,
+    );
   }
 
   String _sanitize(String s) {
