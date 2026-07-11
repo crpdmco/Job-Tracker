@@ -114,9 +114,18 @@ class _ReportsScreenState extends State<ReportsScreen> {
               taskCats: taskCats,
             );
       if (mounted) {
-        final name = path.split(Platform.pathSeparator).last;
+        await svc.share(path);
+        if (mounted) {
+          final name = path.split(Platform.pathSeparator).last;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Report saved: $name')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Report saved: $name')),
+          SnackBar(content: Text('Export error: $e')),
         );
       }
     } finally {

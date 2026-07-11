@@ -1,14 +1,23 @@
 import 'dart:io';
-import 'package:file_selector/file_selector.dart';
 import 'package:intl/intl.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:share_plus/share_plus.dart';
 
 import '../models/task_category.dart';
 import '../models/task.dart';
 import '../models/task_period.dart';
 
 class ReportService {
+  Future<Directory> _ensureDir() async {
+    final base = await getApplicationDocumentsDirectory();
+    final dir = Directory(p.join(base.path, 'reports'));
+    if (!dir.existsSync()) dir.createSync(recursive: true);
+    return dir;
+  }
+
   Future<String> generatePdf({
     required List<Task> tasks,
     required List<TaskCategory> categories,
@@ -71,17 +80,11 @@ class ReportService {
       ),
     );
 
-    final bytes = await doc.save();
-    final loc = await getSaveLocation(
-      suggestedName:
-          'jobtrackr_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}.pdf',
-      acceptedTypeGroups: [
-        XTypeGroup(label: 'PDF', extensions: ['pdf']),
-      ],
-    );
-    if (loc == null) throw Exception('Save cancelled');
-    await File(loc.path).writeAsBytes(bytes);
-    return loc.path;
+    final dir = await _ensureDir();
+    final file = File(p.join(dir.path,
+        'jobtrackr_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}.pdf'));
+    await file.writeAsBytes(await doc.save());
+    return file.path;
   }
 
   pw.Widget _buildTable(
@@ -198,16 +201,16 @@ class ReportService {
       rows.add([t.title, catNames, sessions, t.description ?? '']);
     }
     final csv = ListToCsvConverter().convert(rows);
-    final loc = await getSaveLocation(
-      suggestedName:
-          'jobtrackr_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}.csv',
-      acceptedTypeGroups: [
-        XTypeGroup(label: 'CSV', extensions: ['csv']),
-      ],
-    );
-    if (loc == null) throw Exception('Save cancelled');
-    await File(loc.path).writeAsString(csv);
-    return loc.path;
+    final dir = await _ensureDir();
+    final file = File(p.join(dir.path,
+        'jobtrackr_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}.csv'));
+    await file.writeAsString(csv);
+    return file.path;
+  }
+
+  Future<void> share(String filePath) async {
+    if (!File(filePath).existsSync()) return;
+    await Share.shareXFiles([XFile(filePath)], text: 'JobTrackr report');
   }
 
   String _formatDate(DateTime d) => DateFormat('MMMM d, yyyy').format(d);
